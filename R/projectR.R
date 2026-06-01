@@ -162,6 +162,13 @@ setMethod("projectR",signature(data="matrix",loadings="LinearEmbeddingMatrix"),f
 
 #' @import limma
 #' @importFrom stats var
+#' @param center_by_loadings Logical, default \code{FALSE}. If \code{TRUE},
+#'   centers the new data using the gene means stored in \code{loadings$center}
+#'   (computed from the original training data) before projecting onto the
+#'   loading vectors. If \code{FALSE}, each gene is centered by its mean in
+#'   the new data prior to projection. Only valid when \code{loadings$center}
+#'   is not \code{FALSE}, i.e. when \code{prcomp} was called with
+#'   \code{center = TRUE}.
 #' @examples
 #' pca.RNAseq6l3c3t<-prcomp(t(p.RNAseq6l3c3t))
 #' pca.ESepiGen4c1l<-projectR(data=p.ESepiGen4c1l$mRNA.Seq,
