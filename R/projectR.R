@@ -175,8 +175,33 @@ setMethod("projectR",signature(data="matrix",loadings="prcomp"),function(
   dataNames = NULL, # a vector with names of data rows
   loadingsNames = NULL, # a vector with names of loadings rows
   NP=NA, # vector of integers indicating which columns of loadings object to use. The default of NP=NA will use entire matrix.
+  center_by_loadings = FALSE, # If true, use loadings$center to center the `data` prior to projecting onto loadings
   full=FALSE # logical indicating whether to return the full model solution. By default only the new pattern object is returned.
   ){
+
+  # if `center_by_loadings` is TRUE, verify that the slot exists and is
+  # not FALSE (which is true if the `loadings` are calculated with
+  # center=FALSE)
+  # In addition, require that the names exist. It should as long as the
+  # rownames of the loadings matrix exists
+  if (center_by_loadings) {
+    loadings_center <- loadings$center
+
+    if (is.null(loadings_center) || identical(loadings_center, FALSE)) {
+      stop(
+        "center_by_loadings = TRUE but loadings$center is missing or FALSE. ",
+        "Rerun prcomp() with center = TRUE, or set center_by_loadings = FALSE (default) ",
+        "to center each new sample by its own gene means."
+      )
+    }
+
+    if (is.null(names(loadings_center))) {
+        stop(
+            "loadings$center is unnamed. Cannot gene-match the centering vector. ",
+            "Ensure prcomp() was called with a matrix whose columns are named by gene."
+        )
+    }
+  }
 
   loadings<-loadings$rotation
   ifelse(!is.na(NP),loadings<-loadings[,NP],loadings<-loadings)
@@ -191,12 +216,30 @@ setMethod("projectR",signature(data="matrix",loadings="prcomp"),function(
   dataM<-geneMatchR(data1=data, data2=loadings, data1Names=dataNames, data2Names=loadingsNames, merge=FALSE)
   print(paste(as.character(dim(dataM[[2]])[1]),'row names matched between data and loadings'))
   print(paste('Updated dimension of data:',as.character(paste(dim(dataM[[2]]), collapse = ' '))))
+
   # do projection
-  dat2P<-apply(dataM[[2]],1,function(x) x-mean(x))
+  dat2P <- if (center_by_loadings) {
+      # enforce geneMatchR ordering, and validate that there are no
+      # missing genes. Shouldn't be possible, might as well check anyway
+      loadings_center <- loadings_center[rownames(dataM[[2]])]
+      if (any(is.na(loadings_center))) {
+          missing <- rownames(dataM[[2]])[is.na(loadings_center)]
+          stop(
+              length(missing), " gene(s) in the matched data are absent from ",
+              "loadings$center. This should not happen if loadings is a valid ",
+              "prcomp object"
+          )
+      }
+      # transpose to samples x genes
+      t(sweep(dataM[[2]], 1, loadings_center, "-"))
+  } else {
+      # result is samples x genes
+      apply(dataM[[2]], 1, function(x) x - mean(x))
+  }
   projectionPatterns<- dat2P %*% dataM[[1]] #head(X %*% PCA$rotation)
 
   if(full==TRUE){
-  #calculate percent varience accoutned for by each PC in newdata
+  #calculate percent varience accounted for by each PC in newdata
   #Eigenvalues<-eigen(cov(projectionPatterns))$values
   #PercentVariance<-round(Eigenvalues/sum(Eigenvalues) * 100, digits = 2)
 
